@@ -1,3 +1,5 @@
-module github.com/example/rq-test-client
+module main
 
 go 1.21
+
+require github.com/LumeraProtocol/rq-go v0.1.0
