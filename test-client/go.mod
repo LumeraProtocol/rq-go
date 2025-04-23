@@ -2,5 +2,6 @@ module main
 
 go 1.21
 
-require github.com/LumeraProtocol/rq-go v0.0.0
-replace github.com/LumeraProtocol/rq-go => ../
+require github.com/LumeraProtocol/rq-go v0.2.0
+
+//replace github.com/LumeraProtocol/rq-go => ../
