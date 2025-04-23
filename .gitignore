@@ -25,4 +25,6 @@ go.work.sum
 .env
 
 # IDEs
-.idea/
+.idea
+
+test-client/main

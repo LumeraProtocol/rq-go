@@ -17,7 +17,7 @@ package rq_go
 extern uintptr_t raptorq_init_session(uint16_t symbol_size, uint8_t redundancy_factor, uint64_t max_memory_mb, uint64_t concurrency_limit);
 extern _Bool raptorq_free_session(uintptr_t session_id);
 extern int32_t raptorq_encode_file(uintptr_t session_id, const char *input_path, const char *output_dir, uintptr_t block_size, char *result_buffer, uintptr_t result_buffer_len);
-extern int32_t raptorq_create_metadata(uintptr_t session_id, const char *input_path, const char *output_dir, uintptr_t block_size, bool return_layout, char *result_buffer, uintptr_t result_buffer_len);
+extern int32_t raptorq_create_metadata(uintptr_t session_id, const char *input_path, const char *layout_file, uintptr_t block_size, char *result_buffer, uintptr_t result_buffer_len);
 extern int32_t raptorq_get_last_error(uintptr_t session_id, char *error_buffer, uintptr_t error_buffer_len);
 extern int32_t raptorq_decode_symbols(uintptr_t session_id, const char *symbols_dir, const char *output_path, const char *layout_path);
 extern uintptr_t raptorq_get_recommended_block_size(uintptr_t session_id, uint64_t file_size);
@@ -210,15 +210,69 @@ func (p *RaptorQProcessor) EncodeFile(inputPath, outputDir string, blockSize int
 }
 
 // CreateMetadata creates metadata for RaptorQ encoding without writing symbol data
-// If returnLayout is true, the layout content is returned in the result rather than written to a file
-//
-// This is a temporary implementation calling directly to the Rust library through CGO
-func (p *RaptorQProcessor) CreateMetadata(inputPath, outputDir string, blockSize int, returnLayout bool) (*ProcessResult, error) {
-	// For now, this is a wrapper around EncodeFile
-	// since we're experiencing CGO integration issues with the raptorq_create_metadata function
-	//
-	// TODO: Replace with direct call to raptorq_create_metadata when CGO integration is fixed
-	return p.EncodeFile(inputPath, outputDir, blockSize)
+// It writes the layout information to the specified layout file
+func (p *RaptorQProcessor) CreateMetadata(inputPath, layoutFile string, blockSize int) (*ProcessResult, error) {
+	if p.SessionID == 0 {
+		return nil, fmt.Errorf("RaptorQ session is closed")
+	}
+
+	cInputPath := C.CString(inputPath)
+	defer C.free(unsafe.Pointer(cInputPath))
+
+	cLayoutFile := C.CString(layoutFile)
+	defer C.free(unsafe.Pointer(cLayoutFile))
+
+	// Buffer for result (16KB should be enough for metadata)
+	resultBufSize := 16 * 1024
+	resultBuf := (*C.char)(C.malloc(C.size_t(resultBufSize)))
+	defer C.free(unsafe.Pointer(resultBuf))
+
+	res := C.raptorq_create_metadata(
+		C.uintptr_t(p.SessionID),
+		cInputPath,
+		cLayoutFile,
+		C.uintptr_t(blockSize),
+		resultBuf,
+		C.uintptr_t(resultBufSize),
+	)
+
+	switch res {
+	case 0:
+		// Success
+	case -1:
+		return nil, fmt.Errorf("generic error")
+	case -2:
+		return nil, fmt.Errorf("invalid parameters")
+	case -3:
+		return nil, fmt.Errorf("invalid response (JSON serialization error)")
+	case -4:
+		return nil, fmt.Errorf("result buffer too small")
+	case -5:
+		return nil, fmt.Errorf("invalid session")
+	case -11:
+		return nil, fmt.Errorf("IO error: %s", p.getLastError())
+	case -12:
+		return nil, fmt.Errorf("file not found: %s", p.getLastError())
+	case -13:
+		return nil, fmt.Errorf("invalid path: %s", p.getLastError())
+	case -14:
+		return nil, fmt.Errorf("encoding failed: %s", p.getLastError())
+	case -16:
+		return nil, fmt.Errorf("memory limit exceeded: %s", p.getLastError())
+	case -17:
+		return nil, fmt.Errorf("concurrency limit reached: %s", p.getLastError())
+	default:
+		return nil, fmt.Errorf("unknown error code %d: %s", res, p.getLastError())
+	}
+
+	// Parse the JSON result
+	resultJSON := C.GoString(resultBuf)
+	var result ProcessResult
+	if err := json.Unmarshal([]byte(resultJSON), &result); err != nil {
+		return nil, fmt.Errorf("failed to parse result: %w", err)
+	}
+
+	return &result, nil
 }
 
 // DecodeSymbols decodes RaptorQ symbols back to the original file

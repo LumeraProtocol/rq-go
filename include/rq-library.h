@@ -54,15 +54,15 @@ bool raptorq_free_session(uintptr_t session_id);
  * *  -5 on invalid session
  * * -11 on IO error
  * * -12 on File not found
- * * -13 on Encoding failed
- * * -15 on Memory limit exceeded
- * * -16 on Concurrency limit reached
+ * * -13 on Invalid path
+ * * -14 on Encoding failed
+ * * -16 on Memory limit exceeded
+ * * -17 on Concurrency limit reached
  */
 int32_t raptorq_create_metadata(uintptr_t session_id,
                                 const char *input_path,
-                                const char *output_dir,
+                                const char *layout_file,
                                 uintptr_t block_size,
-                                bool return_layout,
                                 char *result_buffer,
                                 uintptr_t result_buffer_len);
 
@@ -87,9 +87,10 @@ int32_t raptorq_create_metadata(uintptr_t session_id,
  * *  -5 on invalid session
  * * -11 on IO error
  * * -12 on File not found
- * * -13 on Encoding failed
- * * -15 on Memory limit exceeded
- * * -16 on Concurrency limit reached
+ * * -13 on Invalid Path
+ * * -14 on Encoding failed
+ * * -16 on Memory limit exceeded
+ * * -17 on Concurrency limit reached
  */
 int32_t raptorq_encode_file(uintptr_t session_id,
                             const char *input_path,
@@ -133,9 +134,10 @@ int32_t raptorq_get_last_error(uintptr_t session_id,
  * *  -5 on invalid session
  * * -11 on IO error
  * * -12 on File not found
- * * -14 on Decoding failed
- * * -15 on Memory limit exceeded
- * * -16 on Concurrency limit reached
+ * * -13 on Invalid Path
+ * * -15 on Decoding failed
+ * * -16 on Memory limit exceeded
+ * * -17 on Concurrency limit reached
  */
 int32_t raptorq_decode_symbols(uintptr_t session_id,
                                const char *symbols_dir,

@@ -13,6 +13,7 @@ func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage:")
 		fmt.Println("  encode <input_file> [block_size_in_mb]")
+		fmt.Println("  metadata <input_file> <layout_file> [block_size_in_mb]")
 		fmt.Println("  decode <symbols_dir> <output_file> <layout_file>")
 		fmt.Println("  version")
 		os.Exit(1)
@@ -34,6 +35,49 @@ func main() {
 		// Get and print the library version
 		version := raptorq.GetVersion()
 		fmt.Printf("RaptorQ library version: %s\n", version)
+
+	case "metadata":
+		// Check arguments for metadata command
+		if len(os.Args) < 4 {
+			fmt.Println("Error: Missing required arguments for metadata")
+			fmt.Println("Usage: metadata <input_file> <layout_file> [block_size_in_mb]")
+			os.Exit(1)
+		}
+
+		inputFile := os.Args[2]
+		layoutFile := os.Args[3]
+		blockSize := 0 // Default (auto)
+
+		// Parse optional block size
+		if len(os.Args) >= 5 {
+			var blockSizeMB int
+			_, err := fmt.Sscanf(os.Args[4], "%d", &blockSizeMB)
+			if err != nil {
+				fmt.Printf("Error parsing block size: %v\n", err)
+				os.Exit(1)
+			}
+			blockSize = blockSizeMB * 1024 * 1024 // Convert MB to bytes
+		}
+
+		fmt.Printf("Creating metadata for file: %s\n", inputFile)
+		fmt.Printf("Layout file: %s\n", layoutFile)
+		if blockSize > 0 {
+			fmt.Printf("Block size: %d bytes\n", blockSize)
+		} else {
+			fmt.Println("Block size: auto")
+		}
+
+		// Create metadata for the file
+		result, err := processor.CreateMetadata(inputFile, layoutFile, blockSize)
+		if err != nil {
+			fmt.Printf("Error creating metadata: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("Metadata creation successful!\n")
+		fmt.Printf("Layout file: %s\n", result.LayoutFilePath)
+		fmt.Printf("Total symbols: %d\n", result.TotalSymbolsCount)
+		fmt.Printf("Total repair symbols: %d\n", result.TotalRepairSymbols)
 
 	case "encode":
 		// Check arguments for encode command

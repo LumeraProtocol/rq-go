@@ -581,7 +581,7 @@ func TestSysErrorHandlingDecode(t *testing.T) {
 	}
 }
 
-// System test for creating metadata (without returning layout content)
+// System test for creating metadata
 func TestSysCreateMetadata(t *testing.T) {
 	// Create RaptorQ processor with default settings
 	processor, err := NewDefaultRaptorQProcessor()
@@ -598,33 +598,28 @@ func TestSysCreateMetadata(t *testing.T) {
 	ctx := NewTestContext(t, 1024*1024) // 1MB file
 	defer ctx.Cleanup()
 
-	// Create metadata without returning layout (save to file)
-	res, err := processor.CreateMetadata(ctx.InputFile, ctx.SymbolsDir, 0, false)
+	// Create layout file path
+	layoutPath := filepath.Join(ctx.TempDir, "layout.json")
+
+	// Create metadata
+	res, err := processor.CreateMetadata(ctx.InputFile, layoutPath, 0)
 	if err != nil {
 		t.Fatalf("Failed to create metadata: %v", err)
 	}
 
 	// Verify the layout file exists
-	layoutPath := res.LayoutFilePath
 	if _, err := os.Stat(layoutPath); os.IsNotExist(err) {
 		t.Fatalf("Layout file not found at %s", layoutPath)
 	}
 
 	// Verify the result contains expected fields
-	if res.SymbolsDirectory == "" {
-		t.Fatal("Result should contain symbols_directory")
-	}
 	if res.LayoutFilePath == "" {
 		t.Fatal("Result should contain layout_file_path")
 	}
 }
 
-// System test for creating metadata with layout content returned
-func TestSysCreateMetadataReturnLayout(t *testing.T) {
-	// Note: Since our current implementation is a temporary wrapper around EncodeFile,
-	// we can't fully test the returnLayout parameter yet. This test will need to be
-	// updated when the full implementation is complete.
-
+// System test for creating metadata with specific block size
+func TestSysCreateMetadataWithBlockSize(t *testing.T) {
 	// Create RaptorQ processor with default settings
 	processor, err := NewDefaultRaptorQProcessor()
 	if err != nil {
@@ -637,22 +632,33 @@ func TestSysCreateMetadataReturnLayout(t *testing.T) {
 	}()
 
 	// Create test context with input file
-	ctx := NewTestContext(t, 1024*1024) // 1MB file
+	ctx := NewTestContext(t, 5*1024*1024) // 5MB file
 	defer ctx.Cleanup()
 
-	// Create metadata with returnLayout=true (currently uses the same code path)
-	res, err := processor.CreateMetadata(ctx.InputFile, ctx.SymbolsDir, 0, true)
+	// Create layout file path
+	layoutPath := filepath.Join(ctx.TempDir, "layout_with_blocksize.json")
+
+	// Create metadata with specific block size
+	blockSize := 1024 * 1024 // 1MB blocks
+	res, err := processor.CreateMetadata(ctx.InputFile, layoutPath, blockSize)
 	if err != nil {
-		t.Fatalf("Failed to create metadata with returnLayout=true: %v", err)
+		t.Fatalf("Failed to create metadata with specific block size: %v", err)
 	}
 
-	// Verify the layout file exists (when full implementation is done, this should be skipped)
-	layoutPath := res.LayoutFilePath
+	// Verify the layout file exists
 	if _, err := os.Stat(layoutPath); os.IsNotExist(err) {
 		t.Fatalf("Layout file not found at %s", layoutPath)
 	}
 
-	// TODO: When full implementation is complete, verify the result contains layout_content field
+	// Verify the result contains expected fields
+	if res.LayoutFilePath == "" {
+		t.Fatal("Result should contain layout_file_path")
+	}
+
+	// Verify the blocks information is present
+	if len(res.Blocks) == 0 {
+		t.Fatal("Result should contain blocks information")
+	}
 }
 
 // Go-specific test for FFI interactions
@@ -1112,20 +1118,22 @@ func BenchmarkCreateMetadata1MB(b *testing.B) {
 	ctx := setupBenchmarkEnv(b, SIZE_1MB)
 	defer ctx.Cleanup()
 
+	// Create layout file path
+	layoutPath := filepath.Join(ctx.TempDir, "layout.json")
+
 	// Reset timer before starting the benchmark loop
 	b.ResetTimer()
 
 	// Run the benchmark
 	for i := 0; i < b.N; i++ {
-		_, err := processor.CreateMetadata(ctx.InputFile, ctx.SymbolsDir, 0, false)
+		_, err := processor.CreateMetadata(ctx.InputFile, layoutPath, 0)
 		if err != nil {
 			b.Fatalf("Failed to create metadata: %v", err)
 		}
 
-		// Clean symbols directory for next iteration
+		// Remove layout file for next iteration
 		if i < b.N-1 {
-			os.RemoveAll(ctx.SymbolsDir)
-			os.MkdirAll(ctx.SymbolsDir, 0755)
+			os.Remove(layoutPath)
 		}
 	}
 }
@@ -1147,20 +1155,22 @@ func BenchmarkCreateMetadata10MB(b *testing.B) {
 	ctx := setupBenchmarkEnv(b, SIZE_10MB)
 	defer ctx.Cleanup()
 
+	// Create layout file path
+	layoutPath := filepath.Join(ctx.TempDir, "layout_10mb.json")
+
 	// Reset timer before starting the benchmark loop
 	b.ResetTimer()
 
 	// Run the benchmark
 	for i := 0; i < b.N; i++ {
-		_, err := processor.CreateMetadata(ctx.InputFile, ctx.SymbolsDir, 0, true) // with returnLayout=true
+		_, err := processor.CreateMetadata(ctx.InputFile, layoutPath, 0)
 		if err != nil {
 			b.Fatalf("Failed to create metadata: %v", err)
 		}
 
-		// Clean symbols directory for next iteration
+		// Remove layout file for next iteration
 		if i < b.N-1 {
-			os.RemoveAll(ctx.SymbolsDir)
-			os.MkdirAll(ctx.SymbolsDir, 0755)
+			os.Remove(layoutPath)
 		}
 	}
 }
@@ -1185,20 +1195,22 @@ func BenchmarkCreateMetadata100MB(b *testing.B) {
 	// Use block size for large file
 	blockSize := 5 * 1024 * 1024 // 5MB blocks
 
+	// Create layout file path
+	layoutPath := filepath.Join(ctx.TempDir, "layout_100mb.json")
+
 	// Reset timer before starting the benchmark loop
 	b.ResetTimer()
 
 	// Run the benchmark
 	for i := 0; i < b.N; i++ {
-		_, err := processor.CreateMetadata(ctx.InputFile, ctx.SymbolsDir, blockSize, false)
+		_, err := processor.CreateMetadata(ctx.InputFile, layoutPath, blockSize)
 		if err != nil {
 			b.Fatalf("Failed to create metadata: %v", err)
 		}
 
-		// Clean symbols directory for next iteration
+		// Remove layout file for next iteration
 		if i < b.N-1 {
-			os.RemoveAll(ctx.SymbolsDir)
-			os.MkdirAll(ctx.SymbolsDir, 0755)
+			os.Remove(layoutPath)
 		}
 	}
 }
