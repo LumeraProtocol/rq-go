@@ -6,6 +6,7 @@ package rq_go
 // Platform-specific LDFLAGS for static linking
 #cgo linux LDFLAGS: -L${SRCDIR}/lib/linux/amd64 -Wl,-Bstatic -lrq_library -Wl,-Bdynamic -ldl -lm -lpthread
 #cgo darwin LDFLAGS: -L${SRCDIR}/lib/darwin/amd64 -lrq_library -framework Security -framework CoreFoundation -lm
+#cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/lib/darwin/arm64 -lrq_library -framework Security -framework CoreFoundation -lm
 #cgo windows LDFLAGS: -L${SRCDIR}/lib/windows/amd64 -lrq_library -lws2_32 -luserenv -ladvapi32
 
 #include <stdlib.h>
@@ -40,9 +41,9 @@ const (
 	DefaultMaxMemoryMB      uint64 = 16 * 1024
 	DefaultConcurrencyLimit uint64 = 4
 
-	MaxMemoryMB_1GB uint64 = 1 * 1024
+	//MaxMemoryMB_1GB uint64 = 1 * 1024
 	MaxMemoryMB_4GB uint64 = 4 * 1024
-	MaxMemoryMB_8GB uint64 = 8 * 1024
+	//MaxMemoryMB_8GB uint64 = 8 * 1024
 )
 
 // Lock to protect session ID counter
