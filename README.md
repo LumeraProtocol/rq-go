@@ -8,7 +8,6 @@ This repository contains Go bindings for the RaptorQ erasure coding library. It 
 rq-go/
 ├── README.md                 # This file
 ├── go.mod                    # Root Go module file
-├── README.md                 # Documentation for Go bindings
 ├── raptorq.go                # Main Go binding code
 └── raptorq_test.go           # Tests for the Go bindings
 └── lib/                      # Platform-specific libraries
